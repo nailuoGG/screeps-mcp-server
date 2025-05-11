@@ -1,0 +1,19 @@
+# Build artifacts
+build/
+dist/
+coverage/
+
+# Dependencies
+node_modules/
+
+# Config files that Prettier shouldn't touch
+.clinerules
+
+# Lock files (though Prettier usually handles these well, sometimes good to ignore)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Log files
+*.log
+logs/
