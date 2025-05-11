@@ -1,79 +1,88 @@
 #!/usr/bin/env node
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  // CallToolRequestSchema,
-  ListResourcesRequestSchema,
-  ListToolsRequestSchema,
-  // ReadResourceRequestSchema,
-  ListPromptsRequestSchema,
-  // GetPromptRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"; // Changed import
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod"; // Import Zod
 
 import pkg from '../package.json' with { type: 'json' };
 import config from './config/index.js';
 import logger from './utils/logger.js';
 import './utils/errorHandler.js'; // Import to register global error handlers
-import { initializeScreepsAPI, getScreepsAPI, fetchMyInfo } from './api/screepsAPI.js'; // Import initializeScreepsAPI
+import { initializeScreepsAPI, getScreepsAPI } from './api/screepsAPI.js'; // Removed fetchMyInfo as it's not used here directly
 
-const server = new Server(
-  {
-    name: 'screeps-mcp-server', // Updated name
-    version: pkg.version || '0.1.0', // Use version from package.json
-    description: 'MCP Server for interacting with the Screeps game API.',
-  },
-  {
-    capabilities: {
-      resources: {}, // To be populated
-      tools: {},     // To be populated
-      prompts: {},   // To be populated
-    },
+// Create an MCP server instance
+const server = new McpServer({
+  name: 'screeps-mcp-server',
+  version: pkg.version || '0.1.0',
+  description: 'MCP Server for interacting with the Screeps game API.',
+});
+
+// Define getPlayerInfo tool
+server.tool(
+  "getPlayerInfo",
+  "Retrieves basic information (username and GCL) about the authenticated Screeps player.", // Tool description
+  async () => { // Handler - no input argument if no schema is defined beyond a description
+    logger.info('[Tool:getPlayerInfo] Executing.');
+    // Note: If _input was needed from a Zod schema, the signature would be different.
+    // For a no-arg tool defined with only a description, the handler takes no arguments or only 'extra'.
+    try {
+      const api = await getScreepsAPI();
+      if (!api || typeof api.me !== 'function') {
+        logger.error('[Tool:getPlayerInfo] Screeps API not properly initialized or me() method not available.');
+        return {
+          content: [{ type: "text", text: "Error: Screeps API not initialized or me() unavailable" }],
+          isError: true, // Indicate an error response
+        };
+      }
+
+      const response = await api.me(); // Expected to return { _id, username, badge, gcl } or throw error
+
+      if (!response || typeof response.username !== 'string' || typeof response.gcl !== 'number') {
+        logger.error({ response }, '[Tool:getPlayerInfo] Failed to get player info or unexpected response format from api.me().');
+        return {
+          content: [{ type: "text", text: "Error: Failed to retrieve valid player info from Screeps API" }],
+          isError: true,
+        };
+      }
+
+      const { username, gcl } = response;
+      const playerData = { username, gcl };
+
+      logger.info({ username: playerData.username }, '[Tool:getPlayerInfo] Successfully retrieved player info.');
+      // Output schema for success: { username: string, gcl: number }
+      // The SDK expects content to be an array of content parts.
+      // For structured data, it's common to return it as a JSON string or a specific content type.
+      // Let's return it as a JSON string in a text content part.
+      return {
+        content: [{ type: "text", text: JSON.stringify(playerData) }]
+      };
+
+    } catch (error: any) {
+      logger.error({ err: error.message, stack: error.stack }, '[Tool:getPlayerInfo] Error retrieving player info.');
+      return {
+        content: [{ type: "text", text: `Error retrieving player info: ${error.message}` }],
+        isError: true,
+      };
+    }
   }
 );
 
-// Basic request handlers (will be expanded later)
-server.setRequestHandler(ListResourcesRequestSchema, async () => {
-  logger.info('Handling ListResourcesRequest');
-  // Example: could list player info as a resource
-  return { resources: [] }; // Placeholder
-});
-
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  logger.info('Handling ListToolsRequest');
-  // Example: could list a tool to get room details
-  return { tools: [] }; // Placeholder
-});
-
-server.setRequestHandler(ListPromptsRequestSchema, async () => {
-  logger.info('Handling ListPromptsRequest');
-  return { prompts: [] }; // Placeholder
-});
-
+// TODO: Add other tools and resources here using server.tool(...) and server.resource(...)
 
 async function main() {
   logger.info(`Screeps MCP Server starting with log level: ${config.logLevel}`);
   logger.info(`Targeting Screeps server type: ${config.screepsServerType}`);
 
   try {
-    // Initialize Screeps API connection
     await initializeScreepsAPI();
     logger.info('Screeps API connection initialized.');
-
-    // Example: Test API connection by fetching 'me'
-    // This should be done carefully, perhaps only if verbose logging is on,
-    // or as part of a dedicated health check tool.
-    // const me = await fetchMyInfo();
-    // logger.debug({ me }, 'Successfully fetched "me" info.');
-
   } catch (error) {
     logger.error('Failed to initialize Screeps API during server startup. Server will run but API calls may fail.', error);
-    // Depending on severity, might choose to exit: process.exit(1);
   }
 
   const transport = new StdioServerTransport();
   try {
-    await server.connect(transport);
+    await server.connect(transport); // Connect the McpServer instance
     logger.info('Screeps MCP Server connected to transport and ready.');
   } catch (transportError) {
     logger.error('Failed to connect server to transport:', transportError);
@@ -82,8 +91,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  // This catch is for errors during the main() execution itself,
-  // not for errors within the running server (handled by global handlers or try/catches in handlers).
   logger.fatal({ err: error }, 'Fatal error during server startup or connection');
   process.exit(1);
 });
