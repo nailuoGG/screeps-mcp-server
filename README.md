@@ -1,59 +1,94 @@
-# mcp MCP Server
+# Screeps MCP Server
 
-A Model Context Protocol server
+A Model Context Protocol (MCP) server for interacting with the Screeps game API.
 
-This is a TypeScript-based MCP server that implements a simple notes system. It demonstrates core MCP concepts by providing:
+This project provides an MCP-compliant server that exposes Screeps game data and operations as MCP tools and resources. It enables LLMs or other MCP clients to access, query, and operate on Screeps game accounts and data in a structured, protocol-driven way.
 
-- Resources representing text notes with URIs and metadata
-- Tools for creating new notes
-- Prompts for generating summaries of notes
+## Project Purpose
+
+- **Bridge Screeps and AI/LLM tools:** Allow large language models and other MCP clients to interact with the Screeps game via a standard protocol.
+- **Expose Screeps API as MCP tools/resources:** Make player info, game data, and other Screeps API features accessible through MCP.
+- **Support multiple Screeps server types:** Official, private, and Steam servers are supported via configuration.
 
 ## Features
 
-### Resources
-- List and access notes via `note://` URIs
-- Each note has a title, content and metadata
-- Plain text mime type for simple content access
+- **MCP-compliant server:** Implements the Model Context Protocol for easy integration with LLMs and other clients.
+- **Screeps API integration:** Securely connects to Screeps servers using token or username/password.
+- **MCP tools:** Example: `getPlayerInfo` retrieves authenticated player info (username, GCL).
+- **Extensible:** Easily add new MCP tools/resources for more Screeps API endpoints.
+- **Configurable:** Supports official, private, and Steam Screeps servers via environment variables.
 
-### Tools
-- `create_note` - Create new text notes
-  - Takes title and content as required parameters
-  - Stores note in server state
+## Quick Start
 
-### Prompts
-- `summarize_notes` - Generate a summary of all stored notes
-  - Includes all note contents as embedded resources
-  - Returns structured prompt for LLM summarization
-
-## Development
-
-Install dependencies:
+### 1. Install dependencies
 ```bash
 npm install
 ```
 
-Build the server:
+### 2. Build the server
 ```bash
 npm run build
 ```
 
-For development with auto-rebuild:
+### 3. Configure environment variables
+Set the following variables as needed:
+- `SCREEPS_API_TOKEN` (recommended) or `SCREEPS_USERNAME` and `SCREEPS_PASSWORD`
+- `SCREEPS_SERVER_TYPE` (`official`, `private`, or `steam`)
+- `SCREEPS_PRIVATE_HOST`, `SCREEPS_PRIVATE_PORT`, `SCREEPS_PRIVATE_SECURE` (for private/steam servers)
+
+Example:
 ```bash
-npm run watch
+export SCREEPS_API_TOKEN=your_token
+export SCREEPS_SERVER_TYPE=official
 ```
 
-## Installation
+### 4. Run the server
+```bash
+npm start
+```
 
-To use with Claude Desktop, add the server config:
+The server will start and listen for MCP protocol requests over stdio.
 
-On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
+## Configuration
+
+All configuration is via environment variables. See `src/config/index.ts` for details.
+
+- `LOG_LEVEL` (default: `info`)
+- `SCREEPS_API_TOKEN` or `SCREEPS_USERNAME`/`SCREEPS_PASSWORD`
+- `SCREEPS_SERVER_TYPE`: `official`, `private`, or `steam`
+- `SCREEPS_PRIVATE_HOST`, `SCREEPS_PRIVATE_PORT`, `SCREEPS_PRIVATE_SECURE`: for private/steam servers
+
+## MCP Tools & Resources
+
+### Example Tool: `getPlayerInfo`
+Retrieves the authenticated Screeps player's username and GCL (Global Control Level).
+
+**Request:**
+- Tool name: `getPlayerInfo`
+- No parameters required
+
+**Response:**
+```json
+{
+  "username": "your_username",
+  "gcl": 123456
+}
+```
+
+More tools and resources can be added by extending the codebase (see `src/tools/`).
+
+## Integration
+
+### Claude Desktop
+To use this server with Claude Desktop, add the following to your Claude config:
+
+On macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
-    "mcp": {
-      "command": "/path/to/mcp/build/index.js"
+    "screeps": {
+      "command": "/path/to/screeps-mcp-server/build/index.js"
     }
   }
 }
@@ -61,10 +96,20 @@ On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
 
 ### Debugging
 
-Since MCP servers communicate over stdio, debugging can be challenging. We recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector), which is available as a package script:
+For debugging MCP protocol traffic, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
 
 ```bash
 npm run inspector
 ```
 
-The Inspector will provide a URL to access debugging tools in your browser.
+This will provide a browser-based UI for inspecting MCP requests and responses.
+
+## Development
+
+- Use `npm run watch` for auto-rebuild during development.
+- Code is organized for clarity and maintainability. See `src/` for main logic.
+- Contributions are welcome!
+
+## License
+
+MIT
